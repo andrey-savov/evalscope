@@ -7,6 +7,7 @@ from evalscope.cli.benchmark_info import BenchmarkInfoCMD
 from evalscope.cli.start_app import StartAppCMD
 from evalscope.cli.start_eval import EvalCMD
 from evalscope.cli.start_perf import PerfBenchCMD
+from evalscope.cli.start_prune import PruneCMD
 from evalscope.cli.start_service import ServiceCMD
 
 
@@ -20,6 +21,7 @@ def run_cmd():
     StartAppCMD.define_args(subparsers)
     ServiceCMD.define_args(subparsers)
     BenchmarkInfoCMD.define_args(subparsers)
+    PruneCMD.define_args(subparsers)
 
     args = parser.parse_args()
 
