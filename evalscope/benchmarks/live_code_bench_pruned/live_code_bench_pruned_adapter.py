@@ -2,7 +2,10 @@
 """
 LiveCodeBench Pruned Adapter.
 
-Registers ``live_code_bench_pruned`` — an SDS-selected subset of LCB v5.
+Registers ``live_code_bench_pruned`` — an SDS-selected subset of LCB (v1–v5).
+
+The default subset is ``v1_v5`` (315 items, matching the score matrix shipped
+in the challenge repo).  ``v5`` is only the v5 release batch (167 items).
 
 Quick start
 -----------
@@ -14,18 +17,20 @@ Step 2 — evaluate a new model on only those items::
 
     evalscope eval --model <model> \\
         --datasets live_code_bench_pruned \\
-        --dataset-args '{"subset_indices": [0, 1, 5, ...]}'
+        --dataset-args '{"live_code_bench_pruned": {"extra_params": {"subset_indices": [0,1,5,...]}}}'
 
 Or run SDS selection inline::
 
     evalscope eval --model <model> \\
         --datasets live_code_bench_pruned \\
-        --dataset-args '{"prune_ratio": 0.11, "scores_path": "lcb_scores.jsonl"}'
+        --dataset-args '{"live_code_bench_pruned": {"extra_params": {"prune_ratio": 0.11, "scores_path": "lcb_scores.jsonl"}}}'
 
 Notes
 -----
-* ``subset_indices`` are 0-based positions in the **unfiltered** v5 dataset, as
-  produced by ``evalscope prune``.
+* ``subset_indices`` are 0-based positions in the unfiltered ``v1_v5`` dataset
+  (315 items), as produced by ``evalscope prune``.
+* ``extra_params`` must be nested inside the benchmark name key in
+  ``--dataset-args`` (evalscope CLI convention).
 * Date filtering is disabled — the pruned subset is already difficulty-calibrated.
 """
 from __future__ import annotations
@@ -52,22 +57,28 @@ logger = get_logger()
         description="""
 ## Overview
 
-SDS-pruned subset of LiveCodeBench v5.  Evaluating only the selected items
-gives per-model accuracy estimates within ±1% of the full benchmark at ≈11%
-of the compute cost.
+SDS-pruned subset of LiveCodeBench (cumulative v1–v5, 315 items).  Evaluating
+only the 35 selected items gives per-model accuracy estimates within ±1% of the
+full benchmark at ≈11% of the compute cost.
 
 ## Usage
 
-Pass ``subset_indices`` (a pre-computed list from ``evalscope prune``) **or**
+Pass ``subset_indices`` (a pre-computed list from ``evalscope prune``) or
 set ``prune_ratio`` + ``scores_path`` to run SDS selection inline.
+
+## CLI format
+
+``extra_params`` must be nested under the benchmark name key::
+
+    --dataset-args '{"live_code_bench_pruned": {"extra_params": {"subset_indices": [...]}}}'
 
 ## Notes
 
+* ``subset_indices`` are 0-based positions in the unfiltered ``v1_v5`` dataset.
 * Date filtering is disabled; the pruned subset is already difficulty-calibrated.
-* ``subset_indices`` are 0-based positions in the unfiltered LCB v5 dataset.
 """,
         dataset_id='evalscope/livecodebench_code_generation_lite_parquet',
-        subset_list=['v5'],
+        subset_list=['v1_v5'],
         metric_list=['acc'],
         aggregation='mean_and_pass_at_k',
         eval_split='test',
