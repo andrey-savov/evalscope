@@ -8,6 +8,8 @@ signal equivalent to running the full benchmark.
 
 Quick start
 -----------
+Part A — Stratified Discrimination Sampling (LCB, AA-LCR)::
+
     import json, numpy as np
     from evalscope.pruners import SDSPruner
 
@@ -25,14 +27,24 @@ Or from the command line::
         --scores path/to/score_matrix.jsonl \\
         --n 35 \\
         --output selected_indices.json
+
+Part B — MMMU Encoder Probe::
+
+    from evalscope.pruners import EncoderProbePruner
+
+    pruner = EncoderProbePruner(items_per_subject=15)
+    # records: list of raw MMMU record dicts
+    selected = pruner.select_from_records(records)
 """
 
 from .base import BasePruner
+from .encoder_probe_pruner import EncoderProbePruner
 from .noise_filter import estimate_noise_weights
 from .sds_pruner import SDSPruner
 
 __all__ = [
     'BasePruner',
+    'EncoderProbePruner',
     'SDSPruner',
     'estimate_noise_weights',
 ]
