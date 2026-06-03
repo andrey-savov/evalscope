@@ -28,6 +28,32 @@ from evalscope.utils.logger import get_logger
 
 logger = get_logger()
 
+# ---------------------------------------------------------------------------
+# Windows compatibility: signal.SIGALRM is Unix-only.
+# On Windows we provide no-op wrappers so code executes without a timeout
+# (tests complete quickly enough in practice for LCB problems).
+# ---------------------------------------------------------------------------
+_HAS_SIGALRM: bool = hasattr(signal, 'SIGALRM')
+
+
+def _set_alarm_handler(handler) -> None:
+    """Register the SIGALRM handler if available."""
+    if _HAS_SIGALRM:
+        signal.signal(signal.SIGALRM, handler)
+
+
+def _alarm(seconds: int) -> None:
+    """Set an alarm for *seconds* seconds if SIGALRM is available."""
+    if _HAS_SIGALRM:
+        signal.alarm(seconds)
+
+
+def _cancel_alarm() -> None:
+    """Cancel any pending alarm."""
+    if _HAS_SIGALRM:
+        signal.alarm(0)
+
+
 import_string = 'from string import *\nfrom re import *\nfrom datetime import *\nfrom collections import *\nfrom heapq import *\nfrom bisect import *\nfrom copy import *\nfrom math import *\nfrom random import *\nfrom statistics import *\nfrom itertools import *\nfrom functools import *\nfrom operator import *\nfrom io import *\nfrom sys import *\nfrom json import *\nfrom builtins import *\nfrom typing import *\nimport string\nimport re\nimport datetime\nimport collections\nimport heapq\nimport bisect\nimport copy\nimport math\nimport random\nimport statistics\nimport itertools\nimport functools\nimport operator\nimport io\nimport sys\nimport json\nsys.setrecursionlimit(50000)\n'
 
 
@@ -155,7 +181,7 @@ def get_function(compiled_sol, fn_name: str):  # type: ignore
 
 
 def compile_code(code: str, timeout: int):
-    signal.alarm(timeout)
+    _alarm(timeout)
     try:
         tmp_sol = ModuleType('tmp_sol', '')
         exec(code, tmp_sol.__dict__)
@@ -171,7 +197,7 @@ def compile_code(code: str, timeout: int):
 
         assert compiled_sol is not None
     finally:
-        signal.alarm(0)
+        _cancel_alarm()
 
     return compiled_sol
 
@@ -212,14 +238,14 @@ def grade_call_based(code: str, all_inputs: list, all_outputs: list, fn_name: st
     total_execution = 0
     all_results = []
     for idx, (gt_inp, gt_out) in enumerate(zip(all_inputs, all_outputs)):
-        signal.alarm(timeout)
+        _alarm(timeout)
         # faulthandler.enable()
         try:
             # can lock here so time is useful
             start = time.time()
             prediction = method(*gt_inp)
             total_execution += time.time() - start
-            signal.alarm(0)
+            _cancel_alarm()
 
             # don't penalize model if it produces tuples instead of lists
             # ground truth sequences are not tuples
@@ -241,7 +267,7 @@ def grade_call_based(code: str, all_inputs: list, all_outputs: list, fn_name: st
                     'error_message': 'Wrong Answer',
                 }
         except Exception as e:
-            signal.alarm(0)
+            _cancel_alarm()
             if 'timeoutexception' in repr(e).lower():
                 all_results.append(-3)
                 return all_results, {
@@ -262,7 +288,7 @@ def grade_call_based(code: str, all_inputs: list, all_outputs: list, fn_name: st
                 }
 
         finally:
-            signal.alarm(0)
+            _cancel_alarm()
             # faulthandler.disable()
 
     return all_results, {'execution time': total_execution}
@@ -292,7 +318,7 @@ def grade_stdio(
     all_results = []
     total_execution_time = 0
     for idx, (gt_inp, gt_out) in enumerate(zip(all_inputs, all_outputs)):
-        signal.alarm(timeout)
+        _alarm(timeout)
         # faulthandler.enable()
 
         with Capturing() as captured_output:
@@ -301,9 +327,9 @@ def grade_stdio(
                 call_method(method, gt_inp)
                 total_execution_time += time.time() - start
                 # reset the alarm
-                signal.alarm(0)
+                _cancel_alarm()
             except Exception as e:
-                signal.alarm(0)
+                _cancel_alarm()
                 if 'timeoutexception' in repr(e).lower():
                     all_results.append(-3)
                     return all_results, {
@@ -324,7 +350,7 @@ def grade_stdio(
                     }
 
             finally:
-                signal.alarm(0)
+                _cancel_alarm()
                 # faulthandler.disable()
 
         prediction = captured_output[0]
@@ -389,7 +415,7 @@ def run_test(sample, test=None, debug=False, timeout=6):
     otherwise it'll just return an input and output pair.
     """
     timeout_handler_wrapper = partial(timeout_handler, debug)
-    signal.signal(signal.SIGALRM, timeout_handler_wrapper)
+    _set_alarm_handler(timeout_handler_wrapper)
 
     # Disable functionalities that can make destructive changes to the test.
     # max memory is set to 4GB
@@ -426,7 +452,7 @@ def run_test(sample, test=None, debug=False, timeout=6):
             logger.info(f'loading test code = {current_time().time()}')
 
         if which_type == CODE_TYPE.call_based:
-            signal.alarm(timeout)
+            _alarm(timeout)
             try:
                 results, metadata = grade_call_based(
                     code=test,
@@ -442,12 +468,12 @@ def run_test(sample, test=None, debug=False, timeout=6):
                     'error_message': f'Error during testing: {e}',
                 }
             finally:
-                signal.alarm(0)
+                _cancel_alarm()
         elif which_type == CODE_TYPE.standard_input:
             # sol
             # if code has if __name__ == "__main__": then remove it
 
-            signal.alarm(timeout)
+            _alarm(timeout)
             try:
                 results, metadata = grade_stdio(
                     code=test,
@@ -462,7 +488,7 @@ def run_test(sample, test=None, debug=False, timeout=6):
                     'error_message': f'Error during testing: {e}',
                 }
             finally:
-                signal.alarm(0)
+                _cancel_alarm()
 
 
 def reliability_guard(maximum_memory_bytes=None):
